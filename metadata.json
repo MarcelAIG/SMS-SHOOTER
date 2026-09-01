@@ -1,0 +1,8 @@
+{
+  "name": "SMS Shooter",
+  "description": "A simple dashboard for sending SMS manually.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
