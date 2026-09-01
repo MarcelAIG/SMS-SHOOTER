@@ -273,7 +273,7 @@ app.post('/api/campaign/start', async (req, res) => {
 });
 
 
-let lastSendTime = 0;
+let lastSendTime: Record<string, number> = {};
 
 
 function isWithinWindow(timezone, windowStart, windowEnd) {
@@ -308,16 +308,29 @@ setInterval(async () => {
     const now = Date.now();
 
     // 1. Check for active campaigns & process one recipient if possible
-    if (now - lastSendTime >= delaySeconds * 1000) {
-      // Find running campaigns
-      const campaignsSnap = await getDocs(query(collection(db, 'campaigns'), where('status', '==', 'RUNNING')));
+    // Find running campaigns
+    const campaignsSnap = await getDocs(query(collection(db, 'campaigns'), where('status', '==', 'RUNNING')));
+    
+    for (const campDoc of campaignsSnap.docs) {
+      const camp = campDoc.data();
       
-      let sentSomething = false;
+      const intervalMinutes = camp.sendIntervalMinutes || 1;
+      const intervalMs = intervalMinutes * 60 * 1000;
+      const lastSent = lastSendTime[camp.id] || 0;
 
-      for (const campDoc of campaignsSnap.docs) {
-        if (sentSomething) break;
+      if (now - lastSent < intervalMs) {
+        continue;
+      }
 
-        const camp = campDoc.data();
+      // Check Active Days
+      const localNow = DateTime.local().setZone(camp.timezone);
+      const currentDay = localNow.weekdayLong; // e.g., 'Monday'
+      const activeDays = camp.activeDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+      
+      if (!activeDays.includes(currentDay)) {
+        continue;
+      }
+
         
         // Has it reached start time?
         if (now < camp.scheduledStart) continue;
@@ -363,16 +376,17 @@ setInterval(async () => {
           const client = getTwilio();
           const fromNumber = process.env.TWILIO_PHONE_NUMBER!;
           
+          const initialMessage = camp.initialMessage || settings!.initialMessage;
+
           const message = await client.messages.create({
             from: fromNumber,
             to: queueData.contactId,
-            body: settings!.initialMessage,
+            body: initialMessage,
             statusCallback: `${process.env.APP_URL}/api/twilio/status`
           });
           
           const sentTime = Date.now();
-          lastSendTime = sentTime;
-          sentSomething = true;
+          lastSendTime[camp.id] = sentTime;
 
           const msgData = {
             id: message.sid,
@@ -393,11 +407,13 @@ setInterval(async () => {
           await updateDoc(queueDoc.ref, { status: 'Sent', sentAt: sentTime });
           
           // Schedule Follow up and attach timezone/window
-          const fuTime = sentTime + (settings!.followUp1Days * 24 * 60 * 60 * 1000);
+          const fu1DelayMinutes = camp.followUp1DelayMinutes ?? (settings!.followUp1Days * 24 * 60);
+          const fuTime = sentTime + (fu1DelayMinutes * 60 * 1000);
           const fuRef = doc(collection(db, 'scheduledFollowUps'));
           await setDoc(fuRef, {
             id: fuRef.id,
             contactId: queueData.contactId,
+            campaignId: camp.id,
             step: 1,
             scheduledFor: fuTime,
             status: 'pending',
@@ -415,23 +431,50 @@ setInterval(async () => {
           console.error("Failed to send initial SMS", err);
           await updateDoc(queueDoc.ref, { status: 'Failed', sentAt: Date.now() });
         }
-      }
     }
 
     // 2. Process Follow Ups
-    if (now - lastSendTime >= delaySeconds * 1000) {
-      // Find due followups
-      const followupsSnapshot = await getDocs(query(collection(db, 'scheduledFollowUps'), where('status', '==', 'pending'), where('scheduledFor', '<=', now)));
+    // Find due followups
+    const followupsSnapshot = await getDocs(query(collection(db, 'scheduledFollowUps'), where('status', '==', 'pending'), where('scheduledFor', '<=', now)));
+    
+    for (const fuDoc of followupsSnapshot.docs) {
+      const fuData = fuDoc.data();
       
-      for (const fuDoc of followupsSnapshot.docs) {
-        const fuData = fuDoc.data();
+      let cData: any = null;
+      let intervalMs = 60 * 1000; // default 1 min
+      
+      if (fuData.campaignId) {
+        const cDoc = await getDoc(doc(db, 'campaigns', fuData.campaignId));
+        if (cDoc.exists()) {
+           cData = cDoc.data();
+           const intervalMinutes = cData.sendIntervalMinutes || 1;
+           intervalMs = intervalMinutes * 60 * 1000;
+        }
+      }
+
+      const campId = fuData.campaignId || 'unknown';
+      const lastSent = lastSendTime[campId] || 0;
+
+      if (now - lastSent < intervalMs) {
+        continue;
+      }
+
+      // If it has timezone bounds, check them
+      if (fuData.timezone) {
+        const localNow = DateTime.local().setZone(fuData.timezone);
+        const currentDay = localNow.weekdayLong;
+        const activeDays = cData?.activeDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
         
-        // If it has timezone bounds, check them
-        if (fuData.timezone && fuData.sendWindowStart && fuData.sendWindowEnd) {
+        if (!activeDays.includes(currentDay)) {
+          continue;
+        }
+
+        if (fuData.sendWindowStart && fuData.sendWindowEnd) {
           if (!isWithinWindow(fuData.timezone, fuData.sendWindowStart, fuData.sendWindowEnd)) {
             continue; // Not in window, try next one
           }
         }
+      }
 
         const contactDoc = await getDoc(doc(db, 'contacts', fuData.contactId));
         const contact = contactDoc.data();
@@ -442,7 +485,18 @@ setInterval(async () => {
         }
 
         const isStep1 = fuData.step === 1;
-        const body = isStep1 ? settings!.followUp1Message : settings!.followUp2Message;
+        let body = isStep1 ? settings!.followUp1Message : settings!.followUp2Message;
+        
+        if (cData) {
+           if (isStep1 && cData.followUp1Message) body = cData.followUp1Message;
+           if (!isStep1 && cData.followUp2Message) body = cData.followUp2Message;
+        }
+        
+        // Skip if campaign has follow-ups disabled
+        if (cData && cData.allowFollowUps === false) {
+           await updateDoc(fuDoc.ref, { status: 'cancelled' });
+           continue;
+        }
         
         try {
             const client = getTwilio();
@@ -455,7 +509,7 @@ setInterval(async () => {
               statusCallback: `${process.env.APP_URL}/api/twilio/status`
             });
             const sentTime = Date.now();
-            lastSendTime = sentTime;
+            lastSendTime[campId] = sentTime;
             
             await setDoc(doc(db, 'messages', message.sid), {
               id: message.sid,
@@ -475,11 +529,13 @@ setInterval(async () => {
             await updateDoc(fuDoc.ref, { status: 'sent' });
             
             if (isStep1) {
-                const fuTime = sentTime + (settings!.followUp2Days * 24 * 60 * 60 * 1000);
+                const fu2DelayMinutes = cData?.followUp2DelayMinutes ?? (settings!.followUp2Days * 24 * 60);
+                const fuTime = sentTime + (fu2DelayMinutes * 60 * 1000);
                 const fuRef = doc(collection(db, 'scheduledFollowUps'));
                 await setDoc(fuRef, {
                   id: fuRef.id,
                   contactId: fuData.contactId,
+                  campaignId: fuData.campaignId || null,
                   step: 2,
                   scheduledFor: fuTime,
                   status: 'pending',
@@ -504,11 +560,7 @@ setInterval(async () => {
             console.error("Failed to send follow up SMS", e);
             await updateDoc(fuDoc.ref, { status: 'failed' });
         }
-        
-        // Only process one message total per tick if we sent one
-        break;
       }
-    }
 
   } catch (error) {
     console.error("Worker error:", error);

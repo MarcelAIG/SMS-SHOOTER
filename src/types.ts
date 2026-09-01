@@ -46,6 +46,22 @@ export interface Campaign {
   endDate: number | null;
   status: 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'STOPPED' | 'CANCELLED' | 'FAILED';
   createdAt: number;
+  
+  // Campaign-specific sequence options
+  initialMessage?: string;
+  followUp1Message?: string;
+  followUp1DelayMinutes?: number;
+  followUp2Message?: string;
+  followUp2DelayMinutes?: number;
+  
+  // Options
+  sendIntervalMinutes?: number;
+  stopOnReply?: boolean;
+  allowFollowUps?: boolean;
+  skipDuplicates?: boolean;
+  
+  // Schedule
+  activeDays?: string[];
 }
 
 export interface CampaignRecipient {

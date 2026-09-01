@@ -7,8 +7,8 @@ import Dashboard from './pages/Dashboard';
 import Contacts from './pages/Contacts';
 import Inbox from './pages/Inbox';
 import Pipeline from './pages/Pipeline';
-import Campaign from './pages/Campaign';
-import CampaignDetail from './pages/CampaignDetail';
+import CampaignList from './pages/campaigns/CampaignList';
+import CampaignWorkspace from './pages/campaigns/CampaignWorkspace';
 import Settings from './pages/Settings';
 import TestSMS from './pages/TestSMS';
 
@@ -92,8 +92,8 @@ export default function App() {
             <Route path="/inbox" element={<Inbox fromNumber={fromNumber} />} />
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/contacts" element={<Contacts />} />
-            <Route path="/campaign" element={<Campaign />} />
-            <Route path="/campaign/:id" element={<CampaignDetail />} />
+            <Route path="/campaign" element={<CampaignList />} />
+            <Route path="/campaign/:id/*" element={<CampaignWorkspace />} />
             <Route path="/test-sms" element={<TestSMS fromNumber={fromNumber} />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
