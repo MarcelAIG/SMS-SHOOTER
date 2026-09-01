@@ -41,7 +41,8 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
         seqStatus: rcpt.status,
         lastSmsAt: msgs.length > 0 ? Math.max(...msgs.map(m => m.createdAt)) : rcpt.queuedAt || 0,
         reply: inbound.length > 0 ? 'Yes' : 'No',
-        leadStatus: contact?.status || 'Unknown'
+        leadStatus: contact?.status || 'Unknown',
+        errorMessage: rcpt.errorMessage || ''
       });
     }
     setRows(rowData.sort((a, b) => b.lastSmsAt - a.lastSmsAt));
@@ -137,12 +138,20 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
                     <td className="px-5 py-2 text-neutral-400">{r.firstName || '-'}</td>
                     <td className="px-5 py-2 font-mono text-neutral-400">{r.phone}</td>
                     <td className="px-5 py-2">
-                      <span className={`inline-flex items-center text-[11px] font-bold ${
-                        r.seqStatus === 'Failed' ? 'text-red-400' :
-                        r.seqStatus === 'Sent' || r.seqStatus === 'Delivered' ? 'text-green-400' : 'text-blue-400'
-                      }`}>
-                        {r.seqStatus}
-                      </span>
+                      <div className="flex flex-col">
+                        <span className={`inline-flex items-center text-[11px] font-bold ${
+                          ['FAILED', 'Failed'].includes(r.seqStatus) ? 'text-red-400' :
+                          ['SENT', 'DELIVERED', 'Sent', 'Delivered'].includes(r.seqStatus) ? 'text-green-400' : 
+                          ['SKIPPED', 'Skipped'].includes(r.seqStatus) ? 'text-yellow-400' : 'text-blue-400'
+                        }`}>
+                          {r.seqStatus.toUpperCase()}
+                        </span>
+                        {r.errorMessage && (
+                          <span className="text-[9px] text-red-400/80 mt-0.5 truncate max-w-[150px]" title={r.errorMessage}>
+                            {r.errorMessage}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-2 text-neutral-500 text-xs">
                       {r.lastSmsAt > 0 ? DateTime.fromMillis(r.lastSmsAt).toFormat('MMM d, HH:mm') : '-'}

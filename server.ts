@@ -5,7 +5,7 @@ import twilio from 'twilio';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, orderBy, limit, writeBatch, runTransaction } from 'firebase/firestore';
 import fs from 'fs';
 
 dotenv.config();
@@ -165,12 +165,28 @@ app.post('/api/twilio/incoming', async (req, res) => {
         nextFollowUpAt: null
       });
       
-      const schedQuery = query(collection(db, 'scheduledFollowUps'), where('contactId', '==', normFrom), where('status', '==', 'pending'));
-      const sched = await getDocs(schedQuery);
+      // Stop-on-reply per campaign
+      const activeRcpts = await getDocs(query(collection(db, 'campaignRecipients'), where('contactId', '==', normFrom), where('status', 'in', ['Queued', 'Scheduled', 'Pending', 'Sent', 'Delivered'])));
       const batch = writeBatch(db);
-      sched.forEach(d => {
-        batch.update(d.ref, { status: 'cancelled' });
-      });
+      
+      for (const d of activeRcpts.docs) {
+         const rcptData = d.data();
+         if (rcptData.campaignId) {
+             const campDoc = await getDoc(doc(db, 'campaigns', rcptData.campaignId));
+             const campData = campDoc.data();
+             if (campData && campData.stopOnReply !== false) {
+                 batch.update(d.ref, { status: 'REPLIED', hasReplied: true, repliedAt: now });
+                 
+                 // Cancel followups ONLY for this specific campaign
+                 const schedQuery = query(collection(db, 'scheduledFollowUps'), where('contactId', '==', normFrom), where('campaignId', '==', rcptData.campaignId), where('status', '==', 'pending'));
+                 const sched = await getDocs(schedQuery);
+                 sched.forEach(s => {
+                    batch.update(s.ref, { status: 'cancelled' });
+                 });
+             }
+         }
+      }
+      
       await batch.commit();
     }
 
@@ -338,6 +354,20 @@ setInterval(async () => {
         // Has it reached hard cutoff?
         if (camp.endDate && now >= camp.endDate) {
           await updateDoc(campDoc.ref, { status: 'STOPPED' });
+          
+          // Mark all queued as skipped due to cutoff
+          const allPending = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id), where('status', 'in', ['Queued', 'Scheduled', 'Pending'])));
+          const batch = writeBatch(db);
+          allPending.forEach(d => {
+             batch.update(d.ref, { status: 'SKIPPED', errorMessage: 'Campaign Cutoff' });
+          });
+          
+          const allPendingFu = await getDocs(query(collection(db, 'scheduledFollowUps'), where('campaignId', '==', camp.id), where('status', '==', 'pending')));
+          allPendingFu.forEach(d => {
+             batch.update(d.ref, { status: 'cancelled' });
+          });
+          
+          await batch.commit();
           continue;
         }
 
@@ -346,11 +376,11 @@ setInterval(async () => {
           continue;
         }
 
-        // Check global 20 leads/day limit
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        const todayInitialMsgs = await getDocs(query(collection(db, 'messages'), where('direction', '==', 'OUTBOUND'), where('isInitial', '==', true), where('createdAt', '>=', startOfDay.getTime())));
-        if (todayInitialMsgs.size >= 20) {
+        // Check global 20 leads/day limit (Timezone Aware based on campaign)
+        const tzStartOfDay = DateTime.local().setZone(camp.timezone).startOf('day').toMillis();
+        const limitSetting = camp.dailyLeadLimit || 20;
+        const todayInitialMsgs = await getDocs(query(collection(db, 'messages'), where('direction', '==', 'OUTBOUND'), where('isInitial', '==', true), where('createdAt', '>=', tzStartOfDay)));
+        if (todayInitialMsgs.size >= limitSetting) {
            // We cannot send any initial messages today
            continue; 
         }
@@ -359,10 +389,11 @@ setInterval(async () => {
         const queuedSnapshot = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id), where('status', 'in', ['Queued', 'Scheduled', 'Pending']), limit(1)));
         
         if (queuedSnapshot.empty) {
-          // If no more queued, check if there are any failed/etc. Usually we can just mark COMPLETED if all are sent/skipped.
-          // Let's count totals to be safe, or just mark completed if no scheduled are left.
+          // If no more queued, check if there are any failed/etc.
           const anyPending = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id), where('status', 'in', ['Queued', 'Scheduled', 'Pending']), limit(1)));
-          if (anyPending.empty) {
+          const anyPendingFu = await getDocs(query(collection(db, 'scheduledFollowUps'), where('campaignId', '==', camp.id), where('status', '==', 'pending'), limit(1)));
+          
+          if (anyPending.empty && anyPendingFu.empty) {
              await updateDoc(campDoc.ref, { status: 'COMPLETED' });
           }
           continue;
@@ -370,6 +401,25 @@ setInterval(async () => {
 
         const queueDoc = queuedSnapshot.docs[0];
         const queueData = queueDoc.data();
+
+        // Idempotency check: lock the document
+        let acquired = false;
+        try {
+           await runTransaction(db, async (transaction) => {
+              const freshDoc = await transaction.get(queueDoc.ref);
+              const freshData = freshDoc.data();
+              if (!freshDoc.exists() || !['Queued', 'Scheduled', 'Pending'].includes(freshData?.status)) {
+                 throw new Error("ALREADY_PROCESSED");
+              }
+              transaction.update(queueDoc.ref, { status: 'SENDING', lastAttemptAt: Date.now() });
+           });
+           acquired = true;
+        } catch (e: any) {
+           if (e.message !== "ALREADY_PROCESSED") console.error("Transaction error:", e);
+           continue; 
+        }
+        
+        if (!acquired) continue;
 
         // Send Initial SMS
         try {
@@ -404,7 +454,12 @@ setInterval(async () => {
           };
           
           await setDoc(doc(db, 'messages', message.sid), msgData);
-          await updateDoc(queueDoc.ref, { status: 'Sent', sentAt: sentTime });
+          await updateDoc(queueDoc.ref, { 
+             status: 'SENT', 
+             sentAt: sentTime,
+             initialSentAt: sentTime,
+             twilioMessageSid: message.sid
+          });
           
           // Schedule Follow up and attach timezone/window
           const fu1DelayMinutes = camp.followUp1DelayMinutes ?? (settings!.followUp1Days * 24 * 60);
@@ -429,7 +484,12 @@ setInterval(async () => {
           });
         } catch(err: any) {
           console.error("Failed to send initial SMS", err);
-          await updateDoc(queueDoc.ref, { status: 'Failed', sentAt: Date.now() });
+          await updateDoc(queueDoc.ref, { 
+             status: 'FAILED', 
+             lastAttemptAt: Date.now(),
+             errorMessage: err.message,
+             errorCode: err.code 
+          });
         }
     }
 
@@ -498,6 +558,25 @@ setInterval(async () => {
            continue;
         }
         
+        // Idempotency check: lock the follow up document
+        let acquiredFu = false;
+        try {
+           await runTransaction(db, async (transaction) => {
+              const freshDoc = await transaction.get(fuDoc.ref);
+              const freshData = freshDoc.data();
+              if (!freshDoc.exists() || freshData?.status !== 'pending') {
+                 throw new Error("ALREADY_PROCESSED");
+              }
+              transaction.update(fuDoc.ref, { status: 'sending', lastAttemptAt: Date.now() });
+           });
+           acquiredFu = true;
+        } catch (e: any) {
+           if (e.message !== "ALREADY_PROCESSED") console.error("Transaction error:", e);
+           continue; 
+        }
+        
+        if (!acquiredFu) continue;
+        
         try {
             const client = getTwilio();
             const fromNumber = process.env.TWILIO_PHONE_NUMBER!;
@@ -526,7 +605,20 @@ setInterval(async () => {
               isInitial: false
             });
             
-            await updateDoc(fuDoc.ref, { status: 'sent' });
+            await updateDoc(fuDoc.ref, { status: 'sent', sentAt: sentTime });
+            
+            // Also update the recipient document if part of a campaign
+            if (fuData.campaignId) {
+               const rcptSnap = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', fuData.campaignId), where('contactId', '==', fuData.contactId), limit(1)));
+               if (!rcptSnap.empty) {
+                  const rcptDoc = rcptSnap.docs[0];
+                  if (isStep1) {
+                     await updateDoc(rcptDoc.ref, { followUp1SentAt: sentTime });
+                  } else {
+                     await updateDoc(rcptDoc.ref, { followUp2SentAt: sentTime });
+                  }
+               }
+            }
             
             if (isStep1) {
                 const fu2DelayMinutes = cData?.followUp2DelayMinutes ?? (settings!.followUp2Days * 24 * 60);
@@ -556,9 +648,14 @@ setInterval(async () => {
                   lastMessageAt: sentTime
                 });
             }
-        } catch(e) {
+        } catch(e: any) {
             console.error("Failed to send follow up SMS", e);
-            await updateDoc(fuDoc.ref, { status: 'failed' });
+            await updateDoc(fuDoc.ref, { 
+                status: 'failed', 
+                lastAttemptAt: Date.now(),
+                errorMessage: e.message,
+                errorCode: e.code
+            });
         }
       }
 

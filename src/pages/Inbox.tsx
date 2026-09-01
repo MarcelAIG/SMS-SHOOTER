@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact, Message } from '../types';
 import { Send } from 'lucide-react';
@@ -41,46 +41,39 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
       setMessages([]);
       return;
     }
-    let currentUnreadDocs: any[] = [];
-
-    const markAsRead = async () => {
-      if (currentUnreadDocs.length > 0) {
-        const batch = writeBatch(db);
-        currentUnreadDocs.forEach(d => {
-          batch.update(d.ref, { read: true });
-        });
-        await batch.commit();
-        currentUnreadDocs = [];
-      }
-    };
-
-    const handleFocus = () => {
-      markAsRead();
-    };
-
-    window.addEventListener('focus', handleFocus);
 
     const q = query(collection(db, 'messages'), where('contactId', '==', selectedContact.id), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, async (snap) => {
       setMessages(snap.docs.map(d => d.data() as Message));
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-
-      // Automatically mark as read
-      currentUnreadDocs = snap.docs.filter(d => {
-        const data = d.data() as Message;
-        return data.direction === 'INBOUND' && data.read === false;
-      });
-
-      if (document.hasFocus()) {
-        markAsRead();
-      }
     });
 
     return () => {
       unsub();
-      window.removeEventListener('focus', handleFocus);
     };
   }, [selectedContact]);
+
+  const markConversationAsRead = async () => {
+    if (!selectedContact) return;
+    const q = query(collection(db, 'messages'), where('contactId', '==', selectedContact.id), where('direction', '==', 'INBOUND'), where('read', '==', false));
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+    await batch.commit();
+  };
+
+  const markConversationAsUnread = async () => {
+    if (!selectedContact) return;
+    const q = query(collection(db, 'messages'), where('contactId', '==', selectedContact.id), where('direction', '==', 'INBOUND'), where('read', '==', true));
+    const snap = await getDocs(q);
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    // Mark only the most recent one as unread, or all of them. Usually just all of them for simplicity, or just the last one.
+    // Let's mark all inbound for this conversation as unread to be safe.
+    snap.docs.forEach(d => batch.update(d.ref, { read: false }));
+    await batch.commit();
+  };
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,11 +155,16 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
                 <h3 className="text-lg font-medium text-white">{selectedContact.businessName || selectedContact.phone}</h3>
                 <p className="text-sm text-neutral-400">{selectedContact.phone}</p>
               </div>
-              <div>
+              <div className="flex items-center space-x-3">
+                {unreadMap[selectedContact.id] > 0 ? (
+                   <button onClick={markConversationAsRead} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg transition-colors">Mark Read</button>
+                ) : (
+                   <button onClick={markConversationAsUnread} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg transition-colors">Mark Unread</button>
+                )}
                 <select
                   value={selectedContact.status}
                   onChange={handleStatusChange}
-                  className={`border text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-neutral-600 ${getBadgeColors(selectedContact.status)}`}
+                  className={`border text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-neutral-600 ${getBadgeColors(selectedContact.status)}`}
                 >
                   <option className="bg-neutral-900 text-neutral-300" value="NOT INTERESTED">NOT INTERESTED</option>
                   <option className="bg-neutral-900 text-neutral-300" value="INTERESTED">INTERESTED</option>

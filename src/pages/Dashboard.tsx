@@ -37,19 +37,19 @@ export default function Dashboard() {
         const rcpts = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id)));
         let sent = 0, remaining = 0, failed = 0, replies = 0;
         rcpts.forEach(r => {
-          const s = r.data().status;
-          if (s === 'Sent' || s === 'Delivered') sent++;
-          else if (s === 'Failed') failed++;
-          else if (s === 'Queued' || s === 'Pending' || s === 'Scheduled') remaining++;
-          else if (s === 'Skipped') sent++; // skipped is effectively done
+          const data = r.data();
+          const s = (data.status || '').toUpperCase();
+          if (['SENT', 'DELIVERED'].includes(s)) sent++;
+          else if (s === 'FAILED') failed++;
+          else if (['QUEUED', 'PENDING', 'SCHEDULED', 'SENDING'].includes(s)) remaining++;
+          else if (s === 'SKIPPED') sent++; // skipped is effectively done
+          
+          if (s === 'REPLIED' || data.hasReplied) {
+             replies++;
+             sent++; // counts as processed
+          }
         });
-        const msgs = await getDocs(query(collection(db, 'messages'), where('direction', '==', 'INBOUND')));
-        let campReplies = 0;
-        rcpts.forEach(r => {
-           const matches = msgs.docs.filter(d => d.data().contactId === r.data().contactId);
-           if (matches.length > 0) campReplies++;
-        });
-        statsObj[camp.id] = { sent, remaining, failed, replies: campReplies, total: rcpts.size };
+        statsObj[camp.id] = { sent, remaining, failed, replies, total: rcpts.size };
       }
       setCampaignStats(statsObj);
     });

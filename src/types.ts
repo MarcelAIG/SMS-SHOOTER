@@ -59,18 +59,34 @@ export interface Campaign {
   stopOnReply?: boolean;
   allowFollowUps?: boolean;
   skipDuplicates?: boolean;
+  dailyLeadLimit?: number;
   
   // Schedule
   activeDays?: string[];
+  
+  updatedAt?: number;
 }
 
 export interface CampaignRecipient {
   id: string;
   campaignId: string;
   contactId: string;
-  status: 'Pending' | 'Scheduled' | 'Queued' | 'Sent' | 'Delivered' | 'Failed' | 'Cancelled' | 'Skipped';
+  phone?: string;
+  status: 'PENDING' | 'SCHEDULED' | 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'REPLIED' | 'SKIPPED' | 'FAILED' | 'CANCELLED';
+  currentStep?: number;
   queuedAt?: number;
   sentAt?: number | null;
+  initialSentAt?: number;
+  followUp1SentAt?: number;
+  followUp2SentAt?: number;
+  hasReplied?: boolean;
+  repliedAt?: number;
+  nextSendAt?: number;
+  lastAttemptAt?: number;
+  twilioMessageSid?: string;
+  twilioStatus?: string;
+  errorCode?: string | null;
+  errorMessage?: string | null;
 }
 
 
