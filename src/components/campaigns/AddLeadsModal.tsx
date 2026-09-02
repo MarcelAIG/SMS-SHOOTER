@@ -42,7 +42,7 @@ export default function AddLeadsModal({ campaignId, onClose, onAdded }: AddLeads
         businessName: businessName || 'Unknown',
         firstName: firstName || '',
         notes: '',
-        status: 'INTERESTED',
+        status: 'NEW',
         dateAdded: Date.now(),
         lastMessageAt: Date.now(),
         followUpStage: 0,

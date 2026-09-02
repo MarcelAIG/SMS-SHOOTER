@@ -99,7 +99,7 @@ app.post('/api/send-sms', async (req, res) => {
         id: normTo,
         phone: normTo,
         businessName: 'Unknown Contact',
-        status: 'INTERESTED',
+        status: 'NEW',
         dateAdded: now,
         lastMessageAt: now,
         followUpStage: 0,
@@ -153,7 +153,7 @@ app.post('/api/twilio/incoming', async (req, res) => {
         id: normFrom,
         phone: normFrom,
         businessName: 'New Contact',
-        status: 'INTERESTED',
+        status: 'NEW',
         dateAdded: now,
         lastMessageAt: now,
         followUpStage: 0,
@@ -293,9 +293,14 @@ let lastSendTime: Record<string, number> = {};
 
 
 function isWithinWindow(timezone, windowStart, windowEnd) {
-  const localNow = DateTime.local().setZone(timezone);
-  const startDt = DateTime.fromFormat(windowStart, 'HH:mm', { zone: timezone });
-  const endDt = DateTime.fromFormat(windowEnd, 'HH:mm', { zone: timezone });
+  if (!windowStart || !windowEnd) return true;
+  
+  const localNow = DateTime.local().setZone(timezone || 'UTC');
+  const startDt = DateTime.fromFormat(windowStart, 'HH:mm', { zone: timezone || 'UTC' });
+  const endDt = DateTime.fromFormat(windowEnd, 'HH:mm', { zone: timezone || 'UTC' });
+  
+  // If parsing fails, just allow it
+  if (!startDt.isValid || !endDt.isValid) return true;
   
   const currentMinutes = localNow.hour * 60 + localNow.minute;
   const startMinutes = startDt.hour * 60 + startDt.minute;
@@ -339,7 +344,7 @@ setInterval(async () => {
       }
 
       // Check Active Days
-      const localNow = DateTime.local().setZone(camp.timezone);
+      const localNow = DateTime.local().setZone(camp.timezone || 'UTC');
       const currentDay = localNow.weekdayLong; // e.g., 'Monday'
       const activeDays = camp.activeDays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
       
@@ -377,7 +382,7 @@ setInterval(async () => {
         }
 
         // Check global 20 leads/day limit (Timezone Aware based on campaign)
-        const tzStartOfDay = DateTime.local().setZone(camp.timezone).startOf('day').toMillis();
+        const tzStartOfDay = DateTime.local().setZone(camp.timezone || 'UTC').startOf('day').toMillis();
         const limitSetting = camp.dailyLeadLimit || 20;
         const todayInitialMsgs = await getDocs(query(collection(db, 'messages'), where('direction', '==', 'OUTBOUND'), where('isInitial', '==', true), where('createdAt', '>=', tzStartOfDay)));
         if (todayInitialMsgs.size >= limitSetting) {
@@ -390,7 +395,7 @@ setInterval(async () => {
         
         if (queuedSnapshot.empty) {
           // If no more queued, check if there are any failed/etc.
-          const anyPending = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id), where('status', 'in', ['Queued', 'Scheduled', 'Pending']), limit(1)));
+          const anyPending = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id), where('status', 'in', ['Queued', 'Scheduled', 'Pending', 'SENDING']), limit(1)));
           const anyPendingFu = await getDocs(query(collection(db, 'scheduledFollowUps'), where('campaignId', '==', camp.id), where('status', '==', 'pending'), limit(1)));
           
           if (anyPending.empty && anyPendingFu.empty) {

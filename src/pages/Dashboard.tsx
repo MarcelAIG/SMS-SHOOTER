@@ -28,7 +28,9 @@ export default function Dashboard() {
 
     const campaignsQuery = query(collection(db, 'campaigns'), orderBy('createdAt', 'desc'));
     const unsubCampaigns = onSnapshot(campaignsQuery, async (snap) => {
-      const camps = snap.docs.map(d => d.data() as Campaign);
+      const camps = snap.docs
+        .filter(d => d.id !== 'settings' && d.data().name)
+        .map(d => d.data() as Campaign);
       setCampaigns(camps);
 
       // fetch stats for each campaign
@@ -151,7 +153,10 @@ export default function Dashboard() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-800">
-                    {campaigns.slice(0, 20).map(c => {
+                    {campaigns
+                      .filter(c => ['DRAFT', 'SCHEDULED', 'RUNNING', 'PAUSED'].includes(c.status))
+                      .slice(0, 20)
+                      .map(c => {
                       const cStat = campaignStats[c.id] || { sent: 0, remaining: 0, total: 0 };
                       const progress = cStat.total > 0 ? Math.round((cStat.sent / cStat.total) * 100) : 0;
                       return (
@@ -184,7 +189,7 @@ export default function Dashboard() {
                           </td>
                           <td className="px-4 py-2 text-right">
                             <div className="flex justify-end space-x-2">
-                              {(c.status === 'SCHEDULED' || c.status === 'PAUSED' || c.status === 'DRAFT') && (
+                              {['SCHEDULED', 'PAUSED', 'DRAFT', 'STOPPED', 'COMPLETED'].includes(c.status) && (
                                 <button onClick={(e) => { e.stopPropagation(); updateCampaignStatus(c.id, 'RUNNING', c.scheduledStart); }} className="p-1 hover:bg-neutral-700 rounded text-neutral-400 hover:text-white" title="Start/Resume">
                                   <Play className="w-4 h-4" />
                                 </button>
@@ -209,8 +214,8 @@ export default function Dashboard() {
                         </tr>
                       );
                     })}
-                    {campaigns.length === 0 && (
-                      <tr><td colSpan={9} className="px-4 py-6 text-center text-neutral-500">No campaigns found.</td></tr>
+                    {campaigns.filter(c => ['DRAFT', 'SCHEDULED', 'RUNNING', 'PAUSED'].includes(c.status)).length === 0 && (
+                      <tr><td colSpan={9} className="px-4 py-6 text-center text-neutral-500">No active or scheduled campaigns found.</td></tr>
                     )}
                   </tbody>
                 </table>

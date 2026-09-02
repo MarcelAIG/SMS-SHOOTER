@@ -4,7 +4,7 @@ import { db } from '../../db/firebase';
 import { Campaign, CampaignRecipient } from '../../types';
 import NewCampaignModal from '../../components/campaigns/NewCampaignModal';
 import { useNavigate } from 'react-router-dom';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 
 export default function CampaignList() {
   const [campaigns, setCampaigns] = useState<(Campaign & { metrics: any })[]>([]);
@@ -15,35 +15,48 @@ export default function CampaignList() {
   useEffect(() => {
     const q = query(collection(db, 'campaigns'));
     const unsubscribe = onSnapshot(q, async (snap) => {
-      const camps = snap.docs.map(d => d.data() as Campaign);
+      const camps = snap.docs
+        .filter(d => d.id !== 'settings' && d.data().name)
+        .map(d => {
+          const data = d.data();
+          return { ...data, id: d.id } as Campaign;
+        });
       
-      const campaignsWithMetrics = await Promise.all(camps.map(async (camp) => {
-        // Fetch metrics for each campaign
-        const rcptsSnap = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id)));
-        let sent = 0;
-        let total = rcptsSnap.size;
-        
-        // This is a naive metric approach. In a production app you'd want aggregate documents.
-        for (const r of rcptsSnap.docs) {
-           const status = r.data().status;
-           if (['Sent', 'Delivered'].includes(status)) sent++;
-        }
-        
-        return {
-          ...camp,
-          metrics: {
-            leads: total,
-            sent,
-            replies: 0, // Placeholder, calculating replies for all campaigns in list view is expensive without aggregates
-            progress: total > 0 ? Math.round((sent / total) * 100) : 0
+      try {
+        const campaignsWithMetrics = await Promise.all(camps.map(async (camp) => {
+          // Fetch metrics for each campaign
+          const rcptsSnap = await getDocs(query(collection(db, 'campaignRecipients'), where('campaignId', '==', camp.id)));
+          let sent = 0;
+          let total = rcptsSnap.size;
+          
+          // This is a naive metric approach. In a production app you'd want aggregate documents.
+          for (const r of rcptsSnap.docs) {
+             const status = r.data().status;
+             if (['Sent', 'Delivered', 'SENT', 'DELIVERED'].includes(status?.toUpperCase())) sent++;
           }
-        };
-      }));
-      
-      // Sort by newest first
-      campaignsWithMetrics.sort((a, b) => b.createdAt - a.createdAt);
-      setCampaigns(campaignsWithMetrics);
-      setLoading(false);
+          
+          return {
+            ...camp,
+            metrics: {
+              leads: total,
+              sent,
+              replies: 0, // Placeholder, calculating replies for all campaigns in list view is expensive without aggregates
+              progress: total > 0 ? Math.round((sent / total) * 100) : 0
+            }
+          };
+        }));
+        
+        // Sort by newest first
+        campaignsWithMetrics.sort((a, b) => b.createdAt - a.createdAt);
+        setCampaigns(campaignsWithMetrics);
+      } catch (err) {
+        console.error("Error fetching campaign metrics:", err);
+        // Fallback to basic list if metrics fail
+        camps.sort((a, b) => b.createdAt - a.createdAt);
+        setCampaigns(camps.map(c => ({...c, metrics: { leads: 0, sent: 0, replies: 0, progress: 0 }})));
+      } finally {
+        setLoading(false);
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -132,9 +145,24 @@ export default function CampaignList() {
                       </div>
                     </td>
                     <td className="px-6 py-3 text-center">
-                      <button className="p-1.5 rounded-md text-neutral-500 hover:text-white hover:bg-neutral-700 transition-colors opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); navigate(`/campaign/${c.id}/options`); }}>
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center space-x-2 transition-opacity">
+                        <button className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-neutral-700 transition-colors" title="Options" onClick={(e) => { e.stopPropagation(); navigate(`/campaign/${c.id}/options`); }}>
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                        <button className="p-1.5 rounded-md text-red-500/70 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Delete Campaign" onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Are you sure you want to delete this campaign?')) {
+                            import('firebase/firestore').then(({ deleteDoc, doc }) => {
+                              deleteDoc(doc(db, 'campaigns', c.id)).catch(err => {
+                                console.error('Failed to delete campaign:', err);
+                                alert('Failed to delete campaign');
+                              });
+                            });
+                          }
+                        }}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

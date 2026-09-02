@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact, Message } from '../types';
-import { Send } from 'lucide-react';
+import { Send, Copy, Edit2, Check } from 'lucide-react';
 import { getBadgeColors } from '../utils/statusColors';
 
 export default function Inbox({ fromNumber }: { fromNumber: string }) {
@@ -12,6 +12,9 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({});
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editBody, setEditBody] = useState('');
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +55,30 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
       unsub();
     };
   }, [selectedContact]);
+
+  const handleCopy = (msg: Message) => {
+    navigator.clipboard.writeText(msg.body);
+    setCopiedMsgId(msg.id);
+    setTimeout(() => setCopiedMsgId(null), 2000);
+  };
+
+  const startEdit = (msg: Message) => {
+    setEditingMsgId(msg.id);
+    setEditBody(msg.body);
+  };
+
+  const saveEdit = async (msgId: string) => {
+    if (!editBody.trim()) {
+      setEditingMsgId(null);
+      return;
+    }
+    try {
+      await updateDoc(doc(db, 'messages', msgId), { body: editBody });
+      setEditingMsgId(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const markConversationAsRead = async () => {
     if (!selectedContact) return;
@@ -177,11 +204,44 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map(msg => {
                 const isOut = msg.direction === 'OUTBOUND';
+                const isEditing = editingMsgId === msg.id;
+                
                 return (
-                  <div key={msg.id} className={`flex flex-col ${isOut ? 'items-end' : 'items-start'}`}>
-                    <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl ${isOut ? 'bg-neutral-200 text-neutral-900 rounded-tr-sm' : 'bg-neutral-800 text-neutral-100 rounded-tl-sm'}`}>
-                      <p className="whitespace-pre-wrap text-sm">{msg.body}</p>
+                  <div key={msg.id} className={`flex flex-col group ${isOut ? 'items-end' : 'items-start'}`}>
+                    <div className={`flex items-center gap-2 max-w-[85%] ${isOut ? 'flex-row-reverse' : 'flex-row'}`}>
+                      <div className={`px-4 py-2.5 rounded-2xl ${isOut ? 'bg-neutral-200 text-neutral-900 rounded-tr-sm' : 'bg-neutral-800 text-neutral-100 rounded-tl-sm'}`}>
+                        {isEditing ? (
+                          <div className="flex flex-col gap-2 min-w-[200px]">
+                             <textarea 
+                               className="w-full bg-white/60 text-black p-2 rounded text-sm resize-none focus:outline-none" 
+                               value={editBody} 
+                               onChange={e => setEditBody(e.target.value)} 
+                               autoFocus
+                             />
+                             <div className="flex justify-end space-x-2">
+                               <button onClick={() => setEditingMsgId(null)} className="text-[10px] uppercase font-bold text-neutral-500 hover:text-neutral-700">Cancel</button>
+                               <button onClick={() => saveEdit(msg.id)} className="text-[10px] uppercase font-bold text-blue-600 hover:text-blue-800">Save</button>
+                             </div>
+                          </div>
+                        ) : (
+                          <p className="whitespace-pre-wrap text-sm">{msg.body}</p>
+                        )}
+                      </div>
+                      
+                      {!isEditing && (
+                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          {isOut && (
+                             <button onClick={() => startEdit(msg)} className="p-1.5 bg-neutral-800 text-neutral-400 hover:text-white rounded-full shadow-sm" title="Edit">
+                               <Edit2 className="w-3.5 h-3.5" />
+                             </button>
+                          )}
+                          <button onClick={() => handleCopy(msg)} className="p-1.5 bg-neutral-800 text-neutral-400 hover:text-white rounded-full shadow-sm" title="Copy">
+                             {copiedMsgId === msg.id ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      )}
                     </div>
+                    
                     <div className="text-[10px] text-neutral-500 mt-1 flex items-center space-x-2">
                       <span>{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                       {isOut && <span className="capitalize">{msg.status}</span>}

@@ -9,7 +9,6 @@ import Inbox from './pages/Inbox';
 import Pipeline from './pages/Pipeline';
 import CampaignList from './pages/campaigns/CampaignList';
 import CampaignWorkspace from './pages/campaigns/CampaignWorkspace';
-import Settings from './pages/Settings';
 import TestSMS from './pages/TestSMS';
 
 function NavItem({ to, icon: Icon, children, badge }: { to: string, icon: any, children: React.ReactNode, badge?: number }) {
@@ -65,7 +64,7 @@ export default function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-neutral-950 text-neutral-300 flex font-sans selection:bg-neutral-800">
+      <div className="h-screen bg-neutral-950 text-neutral-300 flex font-sans selection:bg-neutral-800">
         {/* Sidebar */}
         <div className="w-64 border-r border-neutral-800 bg-neutral-950 flex flex-col">
           <div className="p-6">
@@ -80,9 +79,6 @@ export default function App() {
             <NavItem to="/campaign" icon={Megaphone}>Campaign</NavItem>
             <NavItem to="/test-sms" icon={MessageSquare}>Test SMS</NavItem>
           </nav>
-          <div className="p-3 border-t border-neutral-800">
-            <NavItem to="/settings" icon={SettingsIcon}>Settings</NavItem>
-          </div>
         </div>
 
         {/* Main Content */}
@@ -95,7 +91,6 @@ export default function App() {
             <Route path="/campaign" element={<CampaignList />} />
             <Route path="/campaign/:id/*" element={<CampaignWorkspace />} />
             <Route path="/test-sms" element={<TestSMS fromNumber={fromNumber} />} />
-            <Route path="/settings" element={<Settings />} />
           </Routes>
         </div>
       </div>

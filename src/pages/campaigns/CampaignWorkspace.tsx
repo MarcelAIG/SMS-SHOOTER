@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Routes, Route, Link, useParams, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, Link, useParams, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { doc, onSnapshot, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
 import { db } from '../../db/firebase';
 import { Campaign } from '../../types';
@@ -12,6 +12,7 @@ import CampaignOptions from './tabs/CampaignOptions';
 export default function CampaignWorkspace() {
   const { id } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [stats, setStats] = useState({ leads: 0, sent: 0, replies: 0, remaining: 0 });
 
@@ -20,6 +21,9 @@ export default function CampaignWorkspace() {
     const unsub = onSnapshot(doc(db, 'campaigns', id), (snap) => {
       if (snap.exists()) {
         setCampaign(snap.data() as Campaign);
+      } else {
+        // Document was deleted
+        navigate('/campaign');
       }
     });
     return () => unsub();
@@ -92,10 +96,10 @@ export default function CampaignWorkspace() {
 
             <div className="flex items-center space-x-3">
               {/* Status Controls */}
-              {['DRAFT', 'PAUSED', 'STOPPED', 'SCHEDULED'].includes(campaign.status) && (
+              {['DRAFT', 'PAUSED', 'STOPPED', 'SCHEDULED', 'COMPLETED'].includes(campaign.status) && (
                 <button onClick={() => updateStatus('RUNNING')} className="inline-flex items-center px-4 py-2 bg-white text-black text-sm font-bold rounded-lg hover:bg-neutral-200 transition-colors">
                   <Play className="w-4 h-4 mr-2" />
-                  Start Campaign
+                  {campaign.status === 'PAUSED' ? 'Resume Campaign' : 'Start Campaign'}
                 </button>
               )}
               {campaign.status === 'RUNNING' && (
@@ -113,6 +117,20 @@ export default function CampaignWorkspace() {
               <button onClick={() => { if(confirm('Cancel campaign? Unsent messages will be cancelled.')) updateStatus('CANCELLED') }} className="inline-flex items-center px-3 py-2 bg-neutral-900 border border-red-900/30 text-red-400 text-sm font-medium rounded-lg hover:bg-red-950 transition-colors">
                 <XCircle className="w-4 h-4 mr-2" />
                 Cancel
+              </button>
+              <button onClick={async () => { 
+                if(confirm('Delete this campaign entirely? This cannot be undone.')) {
+                  try {
+                    const { deleteDoc, doc } = await import('firebase/firestore');
+                    await deleteDoc(doc(db, 'campaigns', id));
+                    // Optional: we can navigate away since it will crash or show loading if doc doesn't exist
+                    // It's handled by the route or the onSnapshot which will see campaign=null
+                  } catch(e) {
+                    alert('Failed to delete campaign');
+                  }
+                } 
+              }} className="inline-flex items-center px-3 py-2 bg-neutral-900 border border-red-900/30 text-red-400 text-sm font-medium rounded-lg hover:bg-red-950 transition-colors">
+                Delete
               </button>
             </div>
           </div>

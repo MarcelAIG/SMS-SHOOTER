@@ -25,7 +25,7 @@ export default function Contacts() {
         businessName: form.businessName || 'Unknown',
         firstName: form.firstName || '',
         notes: form.notes || '',
-        status: 'INTERESTED',
+        status: 'NEW',
         dateAdded: Date.now(),
         lastMessageAt: Date.now(),
         followUpStage: 0,

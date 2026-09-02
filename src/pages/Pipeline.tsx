@@ -43,11 +43,11 @@ export default function Pipeline() {
     <div className="p-8 h-full flex flex-col">
       <h2 className="text-2xl font-bold text-white mb-6">Pipeline</h2>
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
+        <div className="flex-1 grid grid-cols-4 gap-4 pb-4 overflow-hidden">
           {COLUMNS.map(col => {
             const colContacts = contacts.filter(c => c.status === col).sort((a,b) => b.lastMessageAt - a.lastMessageAt);
             return (
-              <div key={col} className={`w-80 flex-shrink-0 flex flex-col bg-neutral-900 rounded-xl border border-neutral-800 border-t-[3px] ${getColumnColors(col)}`}>
+              <div key={col} className={`flex flex-col bg-neutral-900 rounded-xl border border-neutral-800 border-t-[3px] ${getColumnColors(col)} overflow-hidden`}>
                 <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
                   <h3 className="font-semibold text-neutral-200">{col}</h3>
                   <span className="text-xs bg-neutral-800 text-neutral-400 px-2 py-0.5 rounded-full">{colContacts.length}</span>
