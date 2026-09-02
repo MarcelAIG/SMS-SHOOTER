@@ -69,6 +69,52 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
     r.firstName.toLowerCase().includes(search.toLowerCase())
   );
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState(false);
+
+  const toggleAll = () => {
+    if (selectedIds.size === filteredRows.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredRows.map(r => r.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleBulkSend = async (step: 'initial' | 'followup1' | 'followup2') => {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Are you sure you want to send this SMS to ${selectedIds.size} leads?`)) return;
+    
+    setSending(true);
+    try {
+      const res = await fetch('/api/campaign/bulk-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaignId: campaign.id,
+          recipientIds: Array.from(selectedIds),
+          step
+        })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      
+      alert(`Success! Sent: ${data.sent}, Failed: ${data.failed}`);
+      setSelectedIds(new Set());
+      loadLeads();
+    } catch (e: any) {
+      alert(`Bulk send failed: ${e.message}`);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -87,13 +133,28 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
             Filters
           </button>
         </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="flex items-center px-4 py-2 bg-white text-black rounded-lg text-[13px] font-bold hover:bg-neutral-200 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-1.5" />
-          Add Leads
-        </button>
+        <div className="flex items-center space-x-3">
+          {selectedIds.size > 0 && (
+            <div className="flex items-center space-x-2 bg-neutral-900 p-1 rounded-lg border border-neutral-800">
+              <button disabled={sending} onClick={() => handleBulkSend('initial')} className="px-3 py-1.5 bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 rounded text-xs font-bold transition-colors">
+                Send Initial
+              </button>
+              <button disabled={sending} onClick={() => handleBulkSend('followup1')} className="px-3 py-1.5 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded text-xs font-bold transition-colors">
+                Follow Up 1
+              </button>
+              <button disabled={sending} onClick={() => handleBulkSend('followup2')} className="px-3 py-1.5 bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded text-xs font-bold transition-colors">
+                Follow Up 2
+              </button>
+            </div>
+          )}
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center px-4 py-2 bg-white text-black rounded-lg text-[13px] font-bold hover:bg-neutral-200 transition-colors"
+          >
+            <Plus className="w-4 h-4 mr-1.5" />
+            Add Leads
+          </button>
+        </div>
       </div>
 
       <div className="bg-neutral-900 border border-neutral-800 rounded-xl flex-1 overflow-hidden flex flex-col shadow-sm">
@@ -102,7 +163,12 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
             <thead className="text-[11px] font-bold uppercase tracking-wider bg-neutral-900 border-b border-neutral-800 text-neutral-500 sticky top-0 z-10">
               <tr>
                 <th className="px-5 py-4 w-10">
-                  <input type="checkbox" className="accent-white w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
+                  <input 
+                    type="checkbox" 
+                    checked={filteredRows.length > 0 && selectedIds.size === filteredRows.length}
+                    onChange={toggleAll}
+                    className="accent-white w-4 h-4 rounded border-neutral-700 bg-neutral-800 cursor-pointer" 
+                  />
                 </th>
                 <th className="px-5 py-4">Business</th>
                 <th className="px-5 py-4">First Name</th>
@@ -130,9 +196,14 @@ export default function CampaignLeads({ campaign }: CampaignLeadsProps) {
                 </tr>
               ) : (
                 filteredRows.map(r => (
-                  <tr key={r.id} className="hover:bg-neutral-800/40 transition-colors h-[48px] group">
+                  <tr key={r.id} onClick={() => toggleOne(r.id)} className="hover:bg-neutral-800/40 transition-colors h-[48px] group cursor-pointer">
                     <td className="px-5 py-2">
-                      <input type="checkbox" className="accent-white w-4 h-4 rounded border-neutral-700 bg-neutral-800" />
+                      <input 
+                        type="checkbox" 
+                        checked={selectedIds.has(r.id)}
+                        onChange={() => {}} 
+                        className="accent-white w-4 h-4 rounded border-neutral-700 bg-neutral-800 cursor-pointer pointer-events-none" 
+                      />
                     </td>
                     <td className="px-5 py-2 font-medium text-white">{r.businessName}</td>
                     <td className="px-5 py-2 text-neutral-400">{r.firstName || '-'}</td>

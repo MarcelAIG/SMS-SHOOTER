@@ -7,8 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Contacts from './pages/Contacts';
 import Inbox from './pages/Inbox';
 import Pipeline from './pages/Pipeline';
-import CampaignList from './pages/campaigns/CampaignList';
-import CampaignWorkspace from './pages/campaigns/CampaignWorkspace';
+import BulkBlast from './pages/BulkBlast';
 import TestSMS from './pages/TestSMS';
 
 function NavItem({ to, icon: Icon, children, badge }: { to: string, icon: any, children: React.ReactNode, badge?: number }) {
@@ -76,7 +75,7 @@ export default function App() {
             <NavItem to="/inbox" icon={InboxIcon} badge={unreadCount}>Inbox</NavItem>
             <NavItem to="/pipeline" icon={KanbanSquare}>Pipeline</NavItem>
             <NavItem to="/contacts" icon={Users}>Contacts</NavItem>
-            <NavItem to="/campaign" icon={Megaphone}>Campaign</NavItem>
+            <NavItem to="/bulk-blast" icon={Megaphone}>Bulk Blast</NavItem>
             <NavItem to="/test-sms" icon={MessageSquare}>Test SMS</NavItem>
           </nav>
         </div>
@@ -88,8 +87,7 @@ export default function App() {
             <Route path="/inbox" element={<Inbox fromNumber={fromNumber} />} />
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/contacts" element={<Contacts />} />
-            <Route path="/campaign" element={<CampaignList />} />
-            <Route path="/campaign/:id/*" element={<CampaignWorkspace />} />
+            <Route path="/bulk-blast" element={<BulkBlast />} />
             <Route path="/test-sms" element={<TestSMS fromNumber={fromNumber} />} />
           </Routes>
         </div>
