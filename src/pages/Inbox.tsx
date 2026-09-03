@@ -18,7 +18,7 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'contacts'), orderBy('lastMessageAt', 'desc'));
+    const q = query(collection(db, 'contacts'), where('hasReplied', '==', true), orderBy('lastMessageAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
       setContacts(snap.docs.map(d => d.data() as Contact));
     });
