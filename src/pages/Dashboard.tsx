@@ -125,7 +125,7 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-            <StatCard title="Initial SMS Today" value={`${stats.initialSent} / 20`} />
+            <StatCard title="Initial SMS Today" value={stats.initialSent} />
             <StatCard title="Unread SMS" value={stats.unread} valueColor={stats.unread > 0 ? "text-[#ff3b30]" : "text-white"} />
             <StatCard title="Replies Today" value={stats.replies} />
             <StatCard title="Interested" value={stats.interested} />

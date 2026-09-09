@@ -10,6 +10,7 @@ interface CampaignOptionsProps {
 
 export default function CampaignOptions({ campaign }: CampaignOptionsProps) {
   const [sendIntervalMinutes, setSendIntervalMinutes] = useState(campaign.sendIntervalMinutes || 1);
+  const [dailyLeadLimit, setDailyLeadLimit] = useState(campaign.dailyLeadLimit || 20);
   const [stopOnReply, setStopOnReply] = useState(campaign.stopOnReply !== false); // default true
   const [allowFollowUps, setAllowFollowUps] = useState(campaign.allowFollowUps !== false); // default true
   const [skipDuplicates, setSkipDuplicates] = useState(campaign.skipDuplicates !== false); // default true
@@ -21,6 +22,7 @@ export default function CampaignOptions({ campaign }: CampaignOptionsProps) {
     try {
       await updateDoc(doc(db, 'campaigns', campaign.id), {
         sendIntervalMinutes: Math.max(1, sendIntervalMinutes),
+        dailyLeadLimit: Math.max(1, dailyLeadLimit),
         stopOnReply,
         allowFollowUps,
         skipDuplicates
@@ -83,10 +85,16 @@ export default function CampaignOptions({ campaign }: CampaignOptionsProps) {
                 <label className="block text-[13px] font-bold text-white mb-1">Daily New Lead Limit</label>
                 <p className="text-xs text-neutral-500 mb-3">Maximum initial messages per day.</p>
                 <div className="relative">
-                  <input type="number" disabled value={20} className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2.5 text-white font-mono opacity-50 cursor-not-allowed" />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500 uppercase">Fixed</span>
+                  <input 
+                    type="number" 
+                    min="1"
+                    value={dailyLeadLimit} 
+                    onChange={e => setDailyLeadLimit(Math.max(1, parseInt(e.target.value) || 1))} 
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-4 py-2.5 text-white font-mono focus:outline-none focus:ring-2 focus:ring-white/20" 
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500 uppercase">Msg/Day</span>
                 </div>
-                <p className="text-[10px] text-amber-500/80 mt-2">Locked to global backend maximum.</p>
+                <p className="text-[10px] text-green-500/80 mt-2">Adjustable daily limit.</p>
               </div>
 
               <div>

@@ -49,10 +49,6 @@ export default function BulkBlast() {
     if (next.has(id)) {
       next.delete(id);
     } else {
-      if (next.size >= 20) {
-        alert('You can only select up to 20 contacts at once for a bulk blast.');
-        return;
-      }
       next.add(id);
     }
     setSelectedContacts(next);
@@ -148,7 +144,7 @@ export default function BulkBlast() {
       <div className="w-full lg:w-1/2 h-full flex flex-col border-r border-neutral-800">
         <div className="p-8 pb-4 shrink-0 border-b border-neutral-800">
           <h1 className="text-2xl font-bold text-white mb-2">Bulk Blast</h1>
-          <p className="text-sm text-neutral-400">Select up to 20 contacts and instantly blast them a custom message.</p>
+          <p className="text-sm text-neutral-400">Select contacts and instantly blast them a custom message.</p>
         </div>
 
         <div className="p-8 flex-1 overflow-y-auto space-y-6">
@@ -158,7 +154,7 @@ export default function BulkBlast() {
                 <div className="p-4 border-b border-neutral-800 bg-neutral-900/50 flex items-center justify-between">
                     <div>
                         <h3 className="text-white font-medium">1. Select Recipients</h3>
-                        <p className="text-xs text-neutral-500 mt-0.5">{selectedContacts.size}/20 Selected</p>
+                        <p className="text-xs text-neutral-500 mt-0.5">{selectedContacts.size} Selected</p>
                     </div>
                     <div className="relative w-48">
                         <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
