@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs, getDoc } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact, Message } from '../types';
 import { Send, Copy, Edit2, Check } from 'lucide-react';
 import { getBadgeColors } from '../utils/statusColors';
 
 export default function Inbox({ fromNumber }: { fromNumber: string }) {
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [repliedContacts, setRepliedContacts] = useState<Contact[]>([]);
+  const [unreadContacts, setUnreadContacts] = useState<Contact[]>([]);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
@@ -17,13 +18,48 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const contacts = React.useMemo(() => {
+    const all = [...repliedContacts];
+    unreadContacts.forEach(uc => {
+      if (!all.find(c => c.id === uc.id)) {
+        all.push(uc);
+      }
+    });
+    return all.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+  }, [repliedContacts, unreadContacts]);
+
   useEffect(() => {
     const q = query(collection(db, 'contacts'), where('hasReplied', '==', true), orderBy('lastMessageAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
-      setContacts(snap.docs.map(d => d.data() as Contact));
+      setRepliedContacts(snap.docs.map(d => d.data() as Contact));
     });
     return unsub;
   }, []);
+
+  useEffect(() => {
+    const missingContactIds = Object.keys(unreadMap).filter(id => !repliedContacts.find(c => c.id === id));
+    if (missingContactIds.length === 0) {
+      setUnreadContacts([]);
+      return;
+    }
+    const fetchMissing = async () => {
+      const fetched: Contact[] = [];
+      for (const id of missingContactIds) {
+        try {
+          const docSnap = await getDoc(doc(db, 'contacts', id));
+          if (docSnap.exists()) {
+            fetched.push(docSnap.data() as Contact);
+            // Auto-heal the contact in the background
+            updateDoc(doc(db, 'contacts', id), { hasReplied: true }).catch(() => {});
+          }
+        } catch (e) {
+          console.error('Failed to fetch missing contact', e);
+        }
+      }
+      setUnreadContacts(fetched);
+    };
+    fetchMissing();
+  }, [unreadMap, repliedContacts]);
 
   // Global unread listener for sidebar badges
   useEffect(() => {
