@@ -4,11 +4,12 @@ export interface Contact {
   phone: string;
   firstName?: string;
   notes?: string;
-  status: 'NOT INTERESTED' | 'INTERESTED' | 'FOLLOW UP NEEDED' | 'CALL BOOKED';
+  status: 'NEW' | 'NOT INTERESTED' | 'INTERESTED' | 'FOLLOW UP NEEDED' | 'CALL BOOKED';
   dateAdded: number;
   lastMessageAt: number;
   followUpStage: number;
   nextFollowUpAt: number | null;
+  hasReplied?: boolean;
 }
 
 export interface Message {

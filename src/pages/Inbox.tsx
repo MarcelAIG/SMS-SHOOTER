@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, where, doc, updateDoc, writeBatch, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact, Message } from '../types';
-import { Send, Copy, Edit2, Check } from 'lucide-react';
+import { Send, Copy, Edit2, Check, Trash2 } from 'lucide-react';
 import { getBadgeColors } from '../utils/statusColors';
 
 export default function Inbox({ fromNumber }: { fromNumber: string }) {
@@ -172,6 +172,16 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
     }
   };
 
+  const handleDeleteContact = async () => {
+    if (!selectedContact) return;
+    try {
+      await deleteDoc(doc(db, 'contacts', selectedContact.id));
+      setSelectedContact(null);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left List */}
@@ -219,6 +229,9 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
                 <p className="text-sm text-neutral-400">{selectedContact.phone}</p>
               </div>
               <div className="flex items-center space-x-3">
+                <button onClick={handleDeleteContact} className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-neutral-800 rounded-lg transition-colors" title="Delete Lead">
+                  <Trash2 className="w-4 h-4" />
+                </button>
                 {unreadMap[selectedContact.id] > 0 ? (
                    <button onClick={markConversationAsRead} className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg transition-colors">Mark Read</button>
                 ) : (
@@ -229,10 +242,11 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
                   onChange={handleStatusChange}
                   className={`border text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-neutral-600 ${getBadgeColors(selectedContact.status)}`}
                 >
-                  <option className="bg-neutral-900 text-neutral-300" value="NOT INTERESTED">NOT INTERESTED</option>
-                  <option className="bg-neutral-900 text-neutral-300" value="INTERESTED">INTERESTED</option>
-                  <option className="bg-neutral-900 text-neutral-300" value="FOLLOW UP NEEDED">FOLLOW UP NEEDED</option>
-                  <option className="bg-neutral-900 text-neutral-300" value="CALL BOOKED">CALL BOOKED</option>
+                  <option className="bg-neutral-900 text-neutral-300" value="NEW">NEW</option>
+                  <option className="bg-neutral-900 text-red-400" value="NOT INTERESTED">NOT INTERESTED</option>
+                  <option className="bg-neutral-900 text-green-400" value="INTERESTED">INTERESTED</option>
+                  <option className="bg-neutral-900 text-blue-400" value="FOLLOW UP NEEDED">FOLLOW UP NEEDED</option>
+                  <option className="bg-neutral-900 text-purple-400" value="CALL BOOKED">CALL BOOKED</option>
                 </select>
               </div>
             </div>
@@ -294,7 +308,7 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
                   value={draft}
                   onChange={e => setDraft(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 bg-neutral-800 border border-neutral-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-600 resize-none h-12 min-h-[48px] max-h-32"
+                  className="flex-1 bg-neutral-800 border border-neutral-700 text-white rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-neutral-600 resize-y min-h-[60px] max-h-[400px]"
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();

@@ -10,7 +10,10 @@ export default function Contacts() {
 
   useEffect(() => {
     const q = query(collection(db, 'contacts'), orderBy('dateAdded', 'desc'));
-    return onSnapshot(q, snap => setContacts(snap.docs.map(d => d.data() as Contact)));
+    return onSnapshot(q, snap => {
+      const allContacts = snap.docs.map(d => d.data() as Contact);
+      setContacts(allContacts.filter(c => !c.hasReplied && c.status === 'NEW'));
+    });
   }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -39,9 +42,7 @@ export default function Contacts() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Delete contact?')) {
-      await deleteDoc(doc(db, 'contacts', id));
-    }
+    await deleteDoc(doc(db, 'contacts', id));
   };
 
   return (
