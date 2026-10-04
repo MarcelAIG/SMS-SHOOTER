@@ -31,7 +31,7 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
   useEffect(() => {
     const q = query(collection(db, 'contacts'), where('hasReplied', '==', true), orderBy('lastMessageAt', 'desc'));
     const unsub = onSnapshot(q, (snap) => {
-      setRepliedContacts(snap.docs.map(d => d.data() as Contact));
+      setRepliedContacts(snap.docs.map(d => d.data() as Contact).filter(c => !c.excludeFromInbox));
     });
     return unsub;
   }, []);
@@ -48,7 +48,10 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
         try {
           const docSnap = await getDoc(doc(db, 'contacts', id));
           if (docSnap.exists()) {
-            fetched.push(docSnap.data() as Contact);
+            const data = docSnap.data() as Contact;
+            if (!data.excludeFromInbox) {
+              fetched.push(data);
+            }
             // Auto-heal the contact in the background
             updateDoc(doc(db, 'contacts', id), { hasReplied: true }).catch(() => {});
           }
@@ -174,8 +177,9 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
 
   const handleDeleteContact = async () => {
     if (!selectedContact) return;
+    if (!confirm('Are you sure you want to remove this conversation from the Inbox?')) return;
     try {
-      await deleteDoc(doc(db, 'contacts', selectedContact.id));
+      await updateDoc(doc(db, 'contacts', selectedContact.id), { excludeFromInbox: true });
       setSelectedContact(null);
     } catch (e) {
       console.error(e);
@@ -229,7 +233,7 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
                 <p className="text-sm text-neutral-400">{selectedContact.phone}</p>
               </div>
               <div className="flex items-center space-x-3">
-                <button onClick={handleDeleteContact} className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-neutral-800 rounded-lg transition-colors" title="Delete Lead">
+                <button onClick={handleDeleteContact} className="p-1.5 text-neutral-400 hover:text-orange-500 hover:bg-neutral-800 rounded-lg transition-colors" title="Remove from Inbox">
                   <Trash2 className="w-4 h-4" />
                 </button>
                 {unreadMap[selectedContact.id] > 0 ? (

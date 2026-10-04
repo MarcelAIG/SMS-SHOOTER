@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Users, Inbox as InboxIcon, KanbanSquare, Megaphone, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from './db/firebase';
-import Dashboard from './pages/Dashboard';
 import Contacts from './pages/Contacts';
 import Inbox from './pages/Inbox';
 import Pipeline from './pages/Pipeline';
@@ -71,7 +70,6 @@ export default function App() {
             <p className="text-xs text-neutral-500 mt-1 font-mono">{fromNumber}</p>
           </div>
           <nav className="flex-1 px-3 space-y-1">
-            <NavItem to="/" icon={LayoutDashboard}>Dashboard</NavItem>
             <NavItem to="/inbox" icon={InboxIcon} badge={unreadCount}>Inbox</NavItem>
             <NavItem to="/pipeline" icon={KanbanSquare}>Pipeline</NavItem>
             <NavItem to="/contacts" icon={Users}>Contacts</NavItem>
@@ -83,7 +81,7 @@ export default function App() {
         {/* Main Content */}
         <div className="flex-1 overflow-hidden flex flex-col bg-neutral-950">
           <Routes>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<Navigate to="/inbox" replace />} />
             <Route path="/inbox" element={<Inbox fromNumber={fromNumber} />} />
             <Route path="/pipeline" element={<Pipeline />} />
             <Route path="/contacts" element={<Contacts />} />

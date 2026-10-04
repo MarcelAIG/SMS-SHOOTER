@@ -6,6 +6,7 @@ export interface Contact {
   notes?: string;
   status: 'NEW' | 'NOT INTERESTED' | 'INTERESTED' | 'FOLLOW UP NEEDED' | 'CALL BOOKED';
   excludeFromBlast?: boolean;
+  excludeFromInbox?: boolean;
   dateAdded: number;
   lastMessageAt: number;
   followUpStage: number;

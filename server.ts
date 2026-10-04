@@ -158,13 +158,16 @@ app.post('/api/twilio/incoming', async (req, res) => {
         lastMessageAt: now,
         followUpStage: 0,
         nextFollowUpAt: null,
-        hasReplied: true
+        hasReplied: true,
+        excludeFromInbox: false,
+        excludeFromBlast: false
       });
     } else {
       await updateDoc(contactRef, {
         lastMessageAt: now,
         nextFollowUpAt: null,
-        hasReplied: true
+        hasReplied: true,
+        excludeFromInbox: false
       });
       
       // Stop-on-reply per campaign

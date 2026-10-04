@@ -12,7 +12,7 @@ export default function Contacts() {
     const q = query(collection(db, 'contacts'), orderBy('dateAdded', 'desc'));
     return onSnapshot(q, snap => {
       const allContacts = snap.docs.map(d => d.data() as Contact);
-      setContacts(allContacts.filter(c => !c.hasReplied && c.status === 'NEW'));
+      setContacts(allContacts.filter(c => (!c.hasReplied && c.status === 'NEW') || c.excludeFromInbox));
     });
   }, []);
 
@@ -48,6 +48,10 @@ export default function Contacts() {
 
   const handleRestore = async (id: string) => {
     await updateDoc(doc(db, 'contacts', id), { excludeFromBlast: false });
+  };
+
+  const handleRestoreInbox = async (id: string) => {
+    await updateDoc(doc(db, 'contacts', id), { excludeFromInbox: false });
   };
 
   return (
@@ -89,6 +93,9 @@ export default function Contacts() {
                   <td className="px-6 py-4 text-right space-x-3">
                     {c.excludeFromBlast && (
                       <button onClick={() => handleRestore(c.id)} className="text-blue-400 hover:text-blue-300 text-xs">Restore to Blast</button>
+                    )}
+                    {c.excludeFromInbox && (
+                      <button onClick={() => handleRestoreInbox(c.id)} className="text-purple-400 hover:text-purple-300 text-xs">Restore to Inbox</button>
                     )}
                     <button onClick={() => handleDelete(c.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
                   </td>
