@@ -62,12 +62,12 @@ export default function Contacts() {
         <h3 className="text-lg font-medium text-white mb-4">Add Contact</h3>
         <form onSubmit={handleAdd} className="flex gap-4 items-end">
           <div className="flex-1 space-y-1">
-            <label className="text-xs text-neutral-400">Phone</label>
-            <input required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+1234567890" className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white" />
-          </div>
-          <div className="flex-1 space-y-1">
             <label className="text-xs text-neutral-400">Business Name</label>
             <input required value={form.businessName} onChange={e => setForm({...form, businessName: e.target.value})} placeholder="Acme Corp" className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white" />
+          </div>
+          <div className="flex-1 space-y-1">
+            <label className="text-xs text-neutral-400">Phone</label>
+            <input required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="+1234567890" className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-white" />
           </div>
           <button type="submit" className="bg-neutral-200 text-neutral-900 font-medium px-6 py-2 rounded-lg hover:bg-white h-[42px]">Add</button>
         </form>
@@ -78,8 +78,8 @@ export default function Contacts() {
           <table className="w-full text-left text-sm text-neutral-300">
             <thead className="text-xs uppercase bg-neutral-800/50 text-neutral-400">
               <tr>
-                <th className="px-6 py-3 font-medium">Business</th>
                 <th className="px-6 py-3 font-medium">Phone</th>
+                <th className="px-6 py-3 font-medium">Business</th>
                 <th className="px-6 py-3 font-medium">Status</th>
                 <th className="px-6 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -87,8 +87,8 @@ export default function Contacts() {
             <tbody className="divide-y divide-neutral-800">
               {contacts.map((c, index) => (
                 <tr key={c.id} className="hover:bg-neutral-800/30">
-                  <td className="px-6 py-4">{index + 1}. {c.businessName}</td>
                   <td className="px-6 py-4">{c.phone}</td>
+                  <td className="px-6 py-4">{index + 1}. {c.businessName}</td>
                   <td className="px-6 py-4"><span className={`text-xs font-medium px-2 py-1 rounded-md border ${getBadgeColors(c.status)}`}>{c.status}</span></td>
                   <td className="px-6 py-4 text-right space-x-3">
                     {c.excludeFromBlast && (
