@@ -5,6 +5,7 @@ export interface Contact {
   firstName?: string;
   notes?: string;
   status: 'NEW' | 'NOT INTERESTED' | 'INTERESTED' | 'FOLLOW UP NEEDED' | 'CALL BOOKED';
+  excludeFromBlast?: boolean;
   dateAdded: number;
   lastMessageAt: number;
   followUpStage: number;

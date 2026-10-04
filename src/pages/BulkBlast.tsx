@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Send, Search, Check, MessageSquare, History, Phone, Calendar, Trash2 } from 'lucide-react';
-import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, limit, onSnapshot, doc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact } from '../types';
 import { DateTime } from 'luxon';
@@ -21,7 +21,8 @@ export default function BulkBlast() {
   // Load Contacts - Removed orderBy in case index is missing or field doesn't exist
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'contacts')), (snap) => {
-      setContacts(snap.docs.map(d => ({ ...d.data(), id: d.id } as Contact)));
+      const allContacts = snap.docs.map(d => ({ ...d.data(), id: d.id } as Contact));
+      setContacts(allContacts.filter(c => !c.excludeFromBlast));
     });
     return () => unsub();
   }, []);
@@ -117,9 +118,8 @@ export default function BulkBlast() {
 
   const deleteContact = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm('Are you sure you want to permanently delete this contact?')) return;
     try {
-      await deleteDoc(doc(db, 'contacts', id));
+      await updateDoc(doc(db, 'contacts', id), { excludeFromBlast: true });
       // Remove from selected contacts if they were selected
       if (selectedContacts.has(id)) {
         const next = new Set(selectedContacts);
@@ -127,7 +127,7 @@ export default function BulkBlast() {
         setSelectedContacts(next);
       }
     } catch (err: any) {
-      alert('Failed to delete contact: ' + err.message);
+      alert('Failed to remove contact: ' + err.message);
     }
   };
 
@@ -181,8 +181,8 @@ export default function BulkBlast() {
                                 {selectedContacts.has(c.id) && <Check className="w-4 h-4 text-blue-400" />}
                                 <button 
                                     onClick={(e) => deleteContact(e, c.id)} 
-                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-neutral-500 hover:text-red-400 hover:bg-neutral-900 transition-all rounded-md"
-                                    title="Delete Contact"
+                                    className="opacity-0 group-hover:opacity-100 p-1.5 text-neutral-500 hover:text-orange-400 hover:bg-neutral-900 transition-all rounded-md"
+                                    title="Remove from Blast List"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                 </button>

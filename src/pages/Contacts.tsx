@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact } from '../types';
 import { getBadgeColors } from '../utils/statusColors';
@@ -42,7 +42,12 @@ export default function Contacts() {
   };
 
   const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to permanently delete this contact?')) return;
     await deleteDoc(doc(db, 'contacts', id));
+  };
+
+  const handleRestore = async (id: string) => {
+    await updateDoc(doc(db, 'contacts', id), { excludeFromBlast: false });
   };
 
   return (
@@ -81,7 +86,10 @@ export default function Contacts() {
                   <td className="px-6 py-4">{index + 1}. {c.businessName}</td>
                   <td className="px-6 py-4">{c.phone}</td>
                   <td className="px-6 py-4"><span className={`text-xs font-medium px-2 py-1 rounded-md border ${getBadgeColors(c.status)}`}>{c.status}</span></td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right space-x-3">
+                    {c.excludeFromBlast && (
+                      <button onClick={() => handleRestore(c.id)} className="text-blue-400 hover:text-blue-300 text-xs">Restore to Blast</button>
+                    )}
                     <button onClick={() => handleDelete(c.id)} className="text-red-400 hover:text-red-300 text-xs">Delete</button>
                   </td>
                 </tr>
