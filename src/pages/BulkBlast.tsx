@@ -166,14 +166,14 @@ export default function BulkBlast() {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2">
-                    {filteredContacts.map(c => (
+                    {filteredContacts.map((c, index) => (
                         <div 
                             key={c.id} 
                             onClick={() => toggleContact(c.id)}
                             className={`flex items-center justify-between p-3 rounded-lg mb-1 cursor-pointer transition-colors group ${selectedContacts.has(c.id) ? 'bg-blue-500/10 border border-blue-500/20' : 'hover:bg-neutral-800 border border-transparent'}`}
                         >
                             <div>
-                                <div className="text-[13px] font-medium text-white">{c.businessName || c.firstName || 'Unknown'}</div>
+                                <div className="text-[13px] font-medium text-white">{index + 1}. {c.businessName || c.firstName || 'Unknown'}</div>
                                 <div className="text-xs text-neutral-500 font-mono mt-0.5">{c.id}</div>
                             </div>
                             <div className="flex items-center space-x-3">
