@@ -42,7 +42,6 @@ export default function Contacts() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to permanently delete this contact?')) return;
     await deleteDoc(doc(db, 'contacts', id));
   };
 
@@ -78,8 +77,8 @@ export default function Contacts() {
           <table className="w-full text-left text-sm text-neutral-300">
             <thead className="text-xs uppercase bg-neutral-800/50 text-neutral-400">
               <tr>
-                <th className="px-6 py-3 font-medium">Phone</th>
                 <th className="px-6 py-3 font-medium">Business</th>
+                <th className="px-6 py-3 font-medium">Phone</th>
                 <th className="px-6 py-3 font-medium">Status</th>
                 <th className="px-6 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -87,8 +86,8 @@ export default function Contacts() {
             <tbody className="divide-y divide-neutral-800">
               {contacts.map((c, index) => (
                 <tr key={c.id} className="hover:bg-neutral-800/30">
-                  <td className="px-6 py-4">{c.phone}</td>
                   <td className="px-6 py-4">{index + 1}. {c.businessName}</td>
+                  <td className="px-6 py-4">{c.phone}</td>
                   <td className="px-6 py-4"><span className={`text-xs font-medium px-2 py-1 rounded-md border ${getBadgeColors(c.status)}`}>{c.status}</span></td>
                   <td className="px-6 py-4 text-right space-x-3">
                     {c.excludeFromBlast && (

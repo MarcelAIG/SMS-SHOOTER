@@ -108,7 +108,6 @@ export default function BulkBlast() {
   };
 
   const deleteMessage = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this message record?')) return;
     try {
       await deleteDoc(doc(db, 'messages', id));
     } catch (e: any) {

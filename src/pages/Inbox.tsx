@@ -177,7 +177,6 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
 
   const handleDeleteContact = async () => {
     if (!selectedContact) return;
-    if (!confirm('Are you sure you want to remove this conversation from the Inbox?')) return;
     try {
       await updateDoc(doc(db, 'contacts', selectedContact.id), { excludeFromInbox: true });
       setSelectedContact(null);
