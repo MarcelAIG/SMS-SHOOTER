@@ -55,6 +55,24 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
               if (!data.hasReplied) {
                 updateDoc(doc(db, 'contacts', id), { hasReplied: true }).catch(() => {});
               }
+            } else {
+              // Self-heal: Contact is excluded, but has unread messages. Mark them read.
+              const msgQ = query(collection(db, 'messages'), where('contactId', '==', id), where('direction', '==', 'INBOUND'), where('read', '==', false));
+              const msgs = await getDocs(msgQ);
+              if (!msgs.empty) {
+                const batch = writeBatch(db);
+                msgs.forEach(m => batch.update(m.ref, { read: true }));
+                await batch.commit();
+              }
+            }
+          } else {
+            // Self-heal: Contact is deleted, but has unread messages. Mark them read.
+            const msgQ = query(collection(db, 'messages'), where('contactId', '==', id), where('direction', '==', 'INBOUND'), where('read', '==', false));
+            const msgs = await getDocs(msgQ);
+            if (!msgs.empty) {
+              const batch = writeBatch(db);
+              msgs.forEach(m => batch.update(m.ref, { read: true }));
+              await batch.commit();
             }
           }
         } catch (e) {
