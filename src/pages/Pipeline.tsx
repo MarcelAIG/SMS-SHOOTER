@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../db/firebase';
 import { Contact } from '../types';
+import { Trash2 } from 'lucide-react';
 
 import { getColumnColors } from '../utils/statusColors';
 
@@ -65,7 +66,21 @@ export default function Pipeline() {
                               {...provided.dragHandleProps}
                               className="bg-neutral-950 border border-neutral-700 p-4 rounded-lg shadow-sm hover:border-neutral-500 transition-colors"
                             >
-                              <div className="font-medium text-white text-sm mb-1">{c.businessName || c.phone}</div>
+                              <div className="flex justify-between items-start mb-1">
+                                <div className="font-medium text-white text-sm truncate pr-2">{c.businessName || c.phone}</div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (window.confirm('Are you sure you want to remove this lead?')) {
+                                      deleteDoc(doc(db, 'contacts', c.id)).catch(console.error);
+                                    }
+                                  }}
+                                  className="text-neutral-500 hover:text-red-400 hover:bg-red-400/10 p-1 rounded transition-colors flex-shrink-0"
+                                  title="Remove Lead"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                               <div className="text-xs text-neutral-400">{c.phone}</div>
                               <div className="text-[10px] text-neutral-500 mt-2">
                                 Updated {new Date(c.lastMessageAt).toLocaleDateString()}
