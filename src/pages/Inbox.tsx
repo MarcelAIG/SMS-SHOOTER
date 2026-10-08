@@ -51,9 +51,11 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
             const data = docSnap.data() as Contact;
             if (!data.excludeFromInbox) {
               fetched.push(data);
+              // Auto-heal the contact in the background only if it's missing hasReplied
+              if (!data.hasReplied) {
+                updateDoc(doc(db, 'contacts', id), { hasReplied: true }).catch(() => {});
+              }
             }
-            // Auto-heal the contact in the background
-            updateDoc(doc(db, 'contacts', id), { hasReplied: true }).catch(() => {});
           }
         } catch (e) {
           console.error('Failed to fetch missing contact', e);
@@ -178,6 +180,14 @@ export default function Inbox({ fromNumber }: { fromNumber: string }) {
   const handleDeleteContact = async () => {
     if (!selectedContact) return;
     try {
+      const q = query(collection(db, 'messages'), where('contactId', '==', selectedContact.id), where('direction', '==', 'INBOUND'), where('read', '==', false));
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        const batch = writeBatch(db);
+        snap.docs.forEach(d => batch.update(d.ref, { read: true }));
+        await batch.commit();
+      }
+
       await updateDoc(doc(db, 'contacts', selectedContact.id), { excludeFromInbox: true });
       setSelectedContact(null);
     } catch (e) {

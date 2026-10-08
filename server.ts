@@ -103,11 +103,15 @@ app.post('/api/send-sms', async (req, res) => {
         dateAdded: now,
         lastMessageAt: now,
         followUpStage: 0,
-        nextFollowUpAt: null
+        nextFollowUpAt: null,
+        hasReplied: true,
+        excludeFromInbox: false
       });
     } else {
       await updateDoc(contactRef, {
-        lastMessageAt: now
+        lastMessageAt: now,
+        hasReplied: true,
+        excludeFromInbox: false
       });
     }
 
